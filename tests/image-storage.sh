@@ -153,6 +153,8 @@ sed -e "s@/proc/mounts@$FIXTURE@g" -e "s@/sys/block@$SYSFS@g" \
 cp "$ROOT/openwrt/files/zeroclaw.config" "$BUNDLE/openwrt/files/"
 cp "$ROOT/openwrt/files/zeroclaw" "$BUNDLE/openwrt/files/"
 cp "$ROOT/openwrt/files/zeroclaw.init" "$BUNDLE/openwrt/files/"
+cp "$ROOT/openwrt/files/zeroclaw-prompt.sh" "$BUNDLE/openwrt/files/"
+cp "$ROOT/openwrt/files/openwrt-prompt.txt" "$BUNDLE/openwrt/files/"
 sed -e '2i\. "$STUB"' "$ROOT/scripts/prepare-state-image.sh" > "$BUNDLE/prepare-state-image.sh"
 sed -e 's|/etc/|$SYSTEM/etc/|g' -e 's|/usr/|$SYSTEM/usr/|g' \
     -e 's|^\. /lib/functions.sh$|. "$STUB"|' -e '2i\. "$STUB"' \

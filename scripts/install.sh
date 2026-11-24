@@ -77,8 +77,10 @@ if [ -x /etc/init.d/zeroclaw ]; then
     /etc/init.d/zeroclaw stop
 fi
 mv -f "$ZC_ROOT/bin/zeroclaw.new" "$ZC_ROOT/bin/zeroclaw"
-mkdir -p /usr/libexec /usr/bin /etc/init.d /etc/config
+mkdir -p /usr/libexec /usr/bin /usr/share/zeroclaw /etc/init.d /etc/config
 cp "$BUNDLE/openwrt/files/zeroclaw-common.sh" /usr/libexec/zeroclaw-common.sh
+cp "$BUNDLE/openwrt/files/zeroclaw-prompt.sh" /usr/libexec/zeroclaw-prompt.sh
+cp "$BUNDLE/openwrt/files/openwrt-prompt.txt" /usr/share/zeroclaw/openwrt-prompt.txt
 cp "$BUNDLE/openwrt/files/zeroclaw" /usr/bin/zeroclaw
 cp "$BUNDLE/openwrt/files/zeroclaw.init" /etc/init.d/zeroclaw
 chmod 755 /usr/bin/zeroclaw /etc/init.d/zeroclaw

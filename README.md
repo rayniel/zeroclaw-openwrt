@@ -200,6 +200,32 @@ Actions 输入或日志。配置、HOME、默认工作数据应留在卡上；
 如果引导或自定义配置要求选择工作区，也应明确指定卡内路径。
 启动前检查配置中是否有指向 `/root`、内置 overlay 或其他位置的绝对路径。
 
+### 默认 OpenWrt 运维提示词
+
+软件包附带中文 OpenWrt 运维提示词。通过本包的 `zeroclaw quickstart` 成功创建 agent 后，
+包装器会为新 agent 的默认工作区写入缺失的 `AGENTS.md`，由上游原生 personality 加载机制
+加入后续系统提示词，无需在 `$EDITOR` 中粘贴。文件位于状态存储内的
+`config/agents/<alias>/workspace/AGENTS.md`；镜像模式下也在 ext4 镜像里。
+
+内容涵盖 BusyBox/ash、UCI/procd、包管理器识别、空间与挂载检查、敏感信息脱敏、
+变更前确认、断连与回滚风险，以及不对挂载点递归删除等约定。
+它**不是权限配置或安全沙箱**，不会自动切换 risk profile、开放目录、关闭审批或保证 YOLO 安全。
+升级不改写已有 agent；quickstart 中已有的 `AGENTS.md` 也不会覆盖，其他自定义 personality
+文件保持不变。自定义工作区不自动写入，会给出提示，需用户自行审核后放置文件。
+
+已有 agent 可显式应用（以 `ops` 为例）：
+
+```sh
+zeroclaw openwrt-prompt ops
+```
+
+此命令仅在该 agent 没有 `AGENTS.md` 时创建，不覆盖已有文件。修改工作区的 `AGENTS.md`
+即可自定义；删除它可移除这一默认提示词。模板位于
+`/usr/share/zeroclaw/openwrt-prompt.txt`，只占少量内置空间。
+重新启动 agent 后生效。直接运行卡上的原始二进制、旧式 `run-test.sh` 或 gateway quickstart
+不会经过这一 CLI 包装器；需要默认提示词时使用上面的显式命令。
+若提示词写入失败，quickstart 已创建的 agent 不会回滚，应修复文件/挂载问题后再显式应用。
+
 确认前台命令可用后，启用常驻服务：
 
 ```sh

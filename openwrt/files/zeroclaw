@@ -13,4 +13,35 @@ export XDG_DATA_HOME="$ZC_STATE/home/.local/share"
 export XDG_CACHE_HOME="$ZC_STATE/home/.cache"
 mkdir -p "$HOME" "$ZC_STATE/config"
 cd "$ZC_STATE"
+case "${1:-}" in
+    quickstart)
+        for zc_argument in "$@"; do
+            case "$zc_argument" in
+                -h|--help)
+                    exec "$ZC_ROOT/bin/zeroclaw" --config-dir "$ZC_STATE/config" "$@"
+                    ;;
+            esac
+        done
+        . /usr/libexec/zeroclaw-prompt.sh
+        zc_before=''
+        if [ -f "$ZC_STATE/config/config.toml" ]; then
+            zc_before="$(zc_prompt_agent_paths)"
+        fi
+        "$ZC_ROOT/bin/zeroclaw" --config-dir "$ZC_STATE/config" "$@"
+        zc_prompt_after_quickstart "$zc_before" /usr/share/zeroclaw/openwrt-prompt.txt || {
+            echo "zeroclaw: quickstart saved the agent, but the OpenWrt prompt was not fully applied; fix the error and use zeroclaw openwrt-prompt <alias>" >&2
+            exit 1
+        }
+        exit 0
+        ;;
+    openwrt-prompt)
+        if [ "$#" -ne 2 ]; then
+            echo "Usage: zeroclaw openwrt-prompt <agent-alias>" >&2
+            exit 1
+        fi
+        . /usr/libexec/zeroclaw-prompt.sh
+        zc_seed_openwrt_prompt "$2" /usr/share/zeroclaw/openwrt-prompt.txt
+        exit $?
+        ;;
+esac
 exec "$ZC_ROOT/bin/zeroclaw" --config-dir "$ZC_STATE/config" "$@"

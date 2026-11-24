@@ -61,6 +61,26 @@ if grep -F "$token" "$STATE/config/config.toml"; then
 fi
 qemu-arm -cpu cortex-a7 "$BIN" --config-dir "$STATE/config" \
     config get --json composio.api_key | grep '"populated": true'
+
+# Use the real property enumeration/workspace defaults without an interactive TTY.
+qemu-arm -cpu cortex-a7 "$BIN" --config-dir "$STATE/config" config init agents.prompt_test
+ZC_ROOT="$STATE/prompt-runner"
+ZC_STATE="$STATE"
+mkdir -p "$ZC_ROOT/bin"
+PROMPT_TEST_BIN="$BIN"
+export PROMPT_TEST_BIN
+cat > "$ZC_ROOT/bin/zeroclaw" <<'EOF'
+#!/bin/sh
+exec qemu-arm -cpu cortex-a7 "$PROMPT_TEST_BIN" "$@"
+EOF
+chmod 755 "$ZC_ROOT/bin/zeroclaw"
+. "$ROOT/openwrt/files/zeroclaw-prompt.sh"
+zc_seed_openwrt_prompt prompt_test "$ROOT/openwrt/files/openwrt-prompt.txt"
+cmp "$STATE/config/agents/prompt_test/workspace/AGENTS.md" "$ROOT/openwrt/files/openwrt-prompt.txt"
+printf '%s\n' user-customized > "$STATE/config/agents/prompt_test/workspace/AGENTS.md"
+zc_seed_openwrt_prompt prompt_test "$ROOT/openwrt/files/openwrt-prompt.txt"
+grep -Fx user-customized "$STATE/config/agents/prompt_test/workspace/AGENTS.md"
+echo "Real ARM configuration and OpenWrt prompt seeding checks passed"
 umount "$STATE"
 zc_check_storage
 grep -Fx persisted "$STATE/persisted"

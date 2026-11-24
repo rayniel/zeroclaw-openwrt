@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zeroclaw-openwrt
 PKG_VERSION:=0.9.0
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 PKG_LICENSE:=MIT
 PKGARCH:=all
 
@@ -33,9 +33,11 @@ define Build/Compile
 endef
 
 define Package/zeroclaw-openwrt/install
-	$(INSTALL_DIR) $(1)/usr/bin $(1)/usr/libexec $(1)/etc/init.d $(1)/etc/config
+	$(INSTALL_DIR) $(1)/usr/bin $(1)/usr/libexec $(1)/usr/share/zeroclaw $(1)/etc/init.d $(1)/etc/config
 	$(INSTALL_BIN) ./files/zeroclaw $(1)/usr/bin/zeroclaw
 	$(INSTALL_DATA) ./files/zeroclaw-common.sh $(1)/usr/libexec/zeroclaw-common.sh
+	$(INSTALL_DATA) ./files/zeroclaw-prompt.sh $(1)/usr/libexec/zeroclaw-prompt.sh
+	$(INSTALL_DATA) ./files/openwrt-prompt.txt $(1)/usr/share/zeroclaw/openwrt-prompt.txt
 	$(INSTALL_BIN) ./files/zeroclaw.init $(1)/etc/init.d/zeroclaw
 	$(INSTALL_CONF) ./files/zeroclaw.config $(1)/etc/config/zeroclaw
 endef
