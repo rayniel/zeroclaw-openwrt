@@ -8,15 +8,15 @@ STOP=10
 
 start_service() {
     local enabled port
-    zc_load_paths
+    zc_load_paths || return 1
     config_get_bool enabled main enabled 0
     [ "$enabled" -eq 1 ] || return 0
     zc_check_storage || {
         logger -t zeroclaw "Storage check failed; service was not started"
         return 1
     }
-    if [ ! -x "$ZC_ROOT/bin/zeroclaw" ]; then
-        logger -t zeroclaw "Missing binary: $ZC_ROOT/bin/zeroclaw"
+    if ! zc_check_binary "$ZC_ROOT/bin/zeroclaw"; then
+        logger -t zeroclaw "Binary check failed; service was not started"
         return 1
     fi
     config_get port main port 42617
@@ -37,7 +37,7 @@ start_service() {
 }
 
 service_triggers() {
-    zc_load_paths
+    zc_load_paths || return 1
     procd_add_reload_trigger zeroclaw
     procd_add_restart_mount_trigger "$ZC_MOUNT"
 }

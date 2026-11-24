@@ -5,10 +5,7 @@ set -e
 . /usr/libexec/zeroclaw-common.sh
 zc_load_paths
 zc_check_storage
-if [ ! -x "$ZC_ROOT/bin/zeroclaw" ]; then
-    echo "zeroclaw: install the ARMv7 binary in $ZC_ROOT/bin/zeroclaw first" >&2
-    exit 1
-fi
+zc_check_binary "$ZC_ROOT/bin/zeroclaw"
 umask 077
 export HOME="$ZC_ROOT/home"
 export XDG_CONFIG_HOME="$ZC_ROOT/home/.config"

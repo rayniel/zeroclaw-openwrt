@@ -6,8 +6,13 @@ if [ "$(id -u)" -ne 0 ] || [ ! -f /etc/openwrt_release ]; then
     echo "Run this installer as root on OpenWrt" >&2
     exit 1
 fi
+allow_fat=0
+if [ "${1:-}" = '--allow-fat' ]; then
+    allow_fat=1
+    shift
+fi
 if [ "$#" -gt 1 ]; then
-    echo "Usage: sh install.sh [/mnt/mmcblk0p1]" >&2
+    echo "Usage: sh install.sh [--allow-fat] [/mnt/mmcblk0p1]" >&2
     exit 1
 fi
 case "$(uname -m)" in
@@ -18,11 +23,12 @@ BUNDLE="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 . "$BUNDLE/openwrt/files/zeroclaw-common.sh"
 . /lib/functions.sh
 ZC_MOUNT=/mnt/mmcblk0p1
+ZC_ALLOW_FAT=0
 if [ -f /etc/config/zeroclaw ]; then
     zc_load_paths
 fi
 ZC_MOUNT="${1:-$ZC_MOUNT}"
-ZC_ROOT="$ZC_MOUNT/zeroclaw"
+[ "$allow_fat" -eq 0 ] || ZC_ALLOW_FAT=1
 zc_check_storage
 if ! (cd "$BUNDLE" && sha256sum -c SHA256SUMS); then
     echo "Bundle checksum verification failed" >&2
@@ -36,8 +42,10 @@ if [ "$available_kb" -lt "$((binary_kb + 16384))" ]; then
 fi
 mkdir -p "$ZC_ROOT/bin" "$ZC_ROOT/config" "$ZC_ROOT/home"
 cp "$BUNDLE/bin/zeroclaw" "$ZC_ROOT/bin/zeroclaw.new"
-chmod 755 "$ZC_ROOT/bin/zeroclaw.new"
-if ! "$ZC_ROOT/bin/zeroclaw.new" --version; then
+if [ "$ZC_FAT" -eq 0 ]; then
+    chmod 755 "$ZC_ROOT/bin/zeroclaw.new"
+fi
+if ! zc_check_binary "$ZC_ROOT/bin/zeroclaw.new" || ! "$ZC_ROOT/bin/zeroclaw.new" --version; then
     rm -f "$ZC_ROOT/bin/zeroclaw.new"
     echo "Binary could not run on this router; existing binary was not replaced" >&2
     exit 1
@@ -55,6 +63,7 @@ if [ ! -f /etc/config/zeroclaw ]; then
     cp "$BUNDLE/openwrt/files/zeroclaw.config" /etc/config/zeroclaw
 fi
 uci set zeroclaw.main.mountpoint="$ZC_MOUNT"
+uci set zeroclaw.main.allow_fat="$ZC_ALLOW_FAT"
 uci set zeroclaw.main.enabled='0'
 uci commit zeroclaw
 echo "Installed. Service remains stopped and disabled in UCI."

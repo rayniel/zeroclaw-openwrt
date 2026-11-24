@@ -43,10 +43,11 @@ OpenWrt 的 Rust 映射也在启用 FPU 时选择 `musleabihf`，不能只按 SD
 
 ## 安装到 MMC 内存卡
 
-卡须已稳定挂载到 `/mnt/mmcblk0p1`，使用 ext4 等支持 Linux 权限的文件系统，
+卡须已稳定挂载到 `/mnt/mmcblk0p1`，**推荐使用 ext4** 等支持 Linux 权限的文件系统，
 且不是只读或 `noexec` 挂载。**不要直接格式化已有卡**，先确认并备份内容。
 C10 只描述顺序写入等级；随机写入性能、健康和寿命仍需实际观察。
-安装器会拒绝 FAT/exFAT、tmpfs、未挂载目录和不可执行挂载。
+默认拒绝 FAT/exFAT；只有下面的显式兼容模式允许 vfat/exFAT。
+所有模式都拒绝 tmpfs、未挂载目录、只读和 `noexec` 挂载，不会自动重挂载或格式化。
 
 确认固件的包管理器，安装 HTTPS 根证书，并校准系统时间。
 OpenWrt 25.12 使用 APK；如果实际使用 opkg，请不要安装这里构建的 APK。
@@ -74,9 +75,40 @@ zeroclaw quickstart
 
 安装器检查卡内剩余空间、归档内文件校验和及程序能否执行，然后才替换程序。
 首次和升级安装后都保持 UCI 的 `enabled=0`，不会自动运行智能体。
-已有 UCI 配置除挂载路径及启用状态外保留；已有模型密钥和运行数据不会覆盖。
-如需变更挂载点，传入 `sh unpack/install.sh /你的/挂载点`；
+已有 UCI 配置除挂载路径、FAT 兼容开关及启用状态外保留；已有模型密钥和运行数据不会覆盖。
+如需变更挂载点，传入 `sh unpack/install.sh /你的/挂载点`（允许末尾 `/`）；
 需同时自行保证 OpenWrt 的持久挂载配置正确。
+
+### vfat/exFAT 显式兼容模式
+
+为了保留电脑直接读写能力，可以使用 vfat 或 exFAT，但**不保证 ZeroClaw 全功能正常**。
+先备份，并自行配置持久挂载选项，例如 `rw,exec,uid=0,gid=0,umask=0077`；
+也可以使用 `fmask=0077,dmask=0077`。固件须有相应文件系统驱动。
+`fmask` 和 `dmask` 分别覆盖 `umask`，两者的有效值都须为 `0077`，
+使文件和目录仅 root 可读写执行；`umask=0077,fmask=0022` 等组合会被拒绝。
+`fmask=0177` 会移除程序执行位，也不能使用。避免 `showexec`：
+它可能阻止无 `.exe` 后缀的 ZeroClaw 和安装临时文件执行。
+内核可能在 `/proc/mounts` 中省略默认的 `uid=0,gid=0`，脚本仍会验证实际 root 所有权。
+
+完成挂载配置后运行（命令中的末尾 `/` 可以保留）：
+
+```sh
+sh unpack/install.sh --allow-fat /mnt/mmcblk0p1/
+```
+
+安装器将规范化路径，并保存 `zeroclaw.main.allow_fat=1`；
+后续更新会沿用此显式 UCI 开关。CLI 包装器和服务使用同一检查，
+每次启动都会检查挂载权限和实际程序执行能力。
+安装器在 FAT 上不依赖逐文件 `chmod`，仍在替换旧程序前执行新程序检查。
+关闭兼容模式使用 `uci set zeroclaw.main.allow_fat='0'; uci commit zeroclaw`。
+对于 APK 替代安装，须自行设置此开关，且手动放入的程序也须通过同样检查。
+
+**限制与风险：** FAT/exFAT 不支持真正的逐文件 Unix 权限、所有权和符号链接；
+挂载掩码是整张卡的访问策略，不是文件级隔离，卡上其他文件也可能显示为可执行。
+root-only 只限制当前路由器上的非 root 访问，拔卡接电脑后仍能读取配置和 API Key；
+不能将此模式当作加密或密钥保护。依赖符号链接、权限语义的工具或工作区操作可能失败，
+数据库、文件锁、断电恢复及长期可靠性也需真实验证；尤其 exFAT 缺少日志，
+不要热拔卡。需要这些保证时，应迁移到 ext4。
 
 使用引导配置远程模型提供商、模型及 API Key。不要将密钥放进仓库、
 Actions 输入或日志。配置、HOME、默认工作数据应留在卡上；
@@ -105,7 +137,7 @@ logread -e zeroclaw
 | `/mnt/mmcblk0p1/zeroclaw/bin/zeroclaw` | 真正的 ARMv7 可执行程序 |
 | `/mnt/mmcblk0p1/zeroclaw/config` | 上游配置目录，可能包含密钥 |
 | `/mnt/mmcblk0p1/zeroclaw/home` | 隔离的 HOME / XDG 数据、缓存目录 |
-| `/etc/config/zeroclaw` | 挂载路径、服务开关、监听端口，不放 API Key |
+| `/etc/config/zeroclaw` | 挂载路径、FAT 兼容开关、服务开关、监听端口，不放 API Key |
 | `/usr/bin/zeroclaw` | 挂载检查和路径设置包装器 |
 | `/etc/init.d/zeroclaw` | procd 开机启动、异常重启及日志接管 |
 
