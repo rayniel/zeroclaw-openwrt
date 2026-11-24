@@ -41,7 +41,7 @@ if ! (cd "$BUNDLE" && sha256sum -c SHA256SUMS); then
     exit 1
 fi
 binary_kb="$(du -k "$BUNDLE/bin/zeroclaw" | awk '{ print $1 }')"
-available_kb="$(df -Pk "$ZC_MOUNT" | awk 'END { print $4 }')"
+available_kb="$(zc_available_kb "$ZC_MOUNT")"
 image_kb=0
 if [ "$ZC_STORAGE_MODE" = image ] && [ ! -e "$ZC_IMAGE" ]; then
     image_kb=262144

@@ -162,6 +162,12 @@ if sh "$BUNDLE/install.sh" --fat-image "$TEST_MOUNT/"; then
     exit 1
 fi
 [ ! -e "$ZC_IMAGE" ] && [ ! -e "$RECORD" ]
+AVAILABLE=invalid
+if sh "$BUNDLE/install.sh" --fat-image "$TEST_MOUNT/"; then
+    echo "FAIL: invalid free-space output must abort before image creation" >&2
+    exit 1
+fi
+[ ! -e "$ZC_IMAGE" ] && [ ! -e "$RECORD" ]
 AVAILABLE=1048576
 FORMAT_FAIL=1
 if sh "$BUNDLE/install.sh" --fat-image "$TEST_MOUNT/"; then

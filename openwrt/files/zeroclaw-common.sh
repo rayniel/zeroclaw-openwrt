@@ -236,3 +236,16 @@ zc_check_binary() {
         fi
     fi
 }
+
+zc_available_kb() {
+    zc_df="$(df -Pk "$1")" || {
+        echo "zeroclaw: cannot read card free space" >&2
+        return 1
+    }
+    printf '%s\n' "$zc_df" | awk '
+        END { if (NR < 2 || $4 !~ /^[0-9]+$/) exit 1; print $4 }
+    ' || {
+        echo "zeroclaw: invalid card free-space report" >&2
+        return 1
+    }
+}

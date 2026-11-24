@@ -30,7 +30,7 @@ if [ ! -e "$ZC_IMAGE" ] && [ ! -L "$ZC_IMAGE" ]; then
         echo "zeroclaw: install e2fsprogs (mkfs.ext4) and loop/ext4 kernel support first" >&2
         exit 1
     fi
-    available_kb="$(df -Pk "$ZC_MOUNT" | awk 'END { print $4 }')"
+    available_kb="$(zc_available_kb "$ZC_MOUNT")"
     if [ "$available_kb" -lt 278528 ]; then
         echo "zeroclaw: image creation needs 256 MiB plus a 16 MiB card reserve" >&2
         exit 1

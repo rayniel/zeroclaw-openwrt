@@ -45,14 +45,25 @@ grep -Fx persisted "$STATE/persisted"
 
 # Exercise the pinned ARM binary's actual encrypted-secret persistence on ext4.
 token='image-smoke-test-not-a-real-api-key'
-qemu-arm -cpu cortex-a7 "$BIN" --config-dir "$STATE/config" config set composio.api_key "$token"
+if qemu-arm -cpu cortex-a7 "$BIN" --config-dir "$CARD/raw-config" \
+    config set --no-interactive composio.api_key "$token" > "$TEST_DIR/raw.log" 2>&1; then
+    echo "FAIL: raw FAT unexpectedly supported atomic encrypted-key creation" >&2
+    exit 1
+fi
+grep -Ei 'encrypt|publish|not supported|not permitted' "$TEST_DIR/raw.log"
+qemu-arm -cpu cortex-a7 "$BIN" --config-dir "$STATE/config" \
+    config set --no-interactive composio.api_key "$token"
 [ -s "$STATE/config/.secret_key" ]
 [ "$(stat -c %a "$STATE/config/.secret_key")" = 600 ]
 if grep -F "$token" "$STATE/config/config.toml"; then
     echo "FAIL: test API key was saved as plaintext" >&2
     exit 1
 fi
+qemu-arm -cpu cortex-a7 "$BIN" --config-dir "$STATE/config" \
+    config get --json composio.api_key | grep '"populated": true'
 umount "$STATE"
 zc_check_storage
 grep -Fx persisted "$STATE/persisted"
+qemu-arm -cpu cortex-a7 "$BIN" --config-dir "$STATE/config" \
+    config get --json composio.api_key | grep '"populated": true'
 echo "Real FAT/ext4 loop mount and encrypted-key persistence checks passed"
