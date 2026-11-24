@@ -40,7 +40,7 @@ if ! (cd "$BUNDLE" && sha256sum -c SHA256SUMS); then
     echo "Bundle checksum verification failed" >&2
     exit 1
 fi
-binary_kb="$(du -k "$BUNDLE/bin/zeroclaw" | awk '{ print $1 }')"
+binary_kb="$(du -k "$BUNDLE/bin/zeroclaw" "$BUNDLE/bin/zerocode" | awk '{ total += $1 } END { print total }')"
 available_kb="$(zc_available_kb "$ZC_MOUNT")"
 image_kb=0
 if [ "$ZC_STORAGE_MODE" = image ] && [ ! -e "$ZC_IMAGE" ]; then
@@ -64,26 +64,30 @@ mkdir -p "$ZC_ROOT/bin" "$ZC_STATE/config" "$ZC_STATE/home"
 if [ "$ZC_STORAGE_MODE" = image ]; then
     chmod 700 "$ZC_STATE/config" "$ZC_STATE/home"
 fi
-cp "$BUNDLE/bin/zeroclaw" "$ZC_ROOT/bin/zeroclaw.new"
-if [ "$ZC_FAT" -eq 0 ]; then
-    chmod 755 "$ZC_ROOT/bin/zeroclaw.new"
-fi
-if ! zc_check_binary "$ZC_ROOT/bin/zeroclaw.new" || ! "$ZC_ROOT/bin/zeroclaw.new" --version; then
-    rm -f "$ZC_ROOT/bin/zeroclaw.new"
-    echo "Binary could not run on this router; existing binary was not replaced" >&2
-    exit 1
-fi
+for program in zeroclaw zerocode; do
+    cp "$BUNDLE/bin/$program" "$ZC_ROOT/bin/$program.new"
+    if [ "$ZC_FAT" -eq 0 ]; then
+        chmod 755 "$ZC_ROOT/bin/$program.new"
+    fi
+    if ! zc_check_binary "$ZC_ROOT/bin/$program.new" || ! "$ZC_ROOT/bin/$program.new" --version; then
+        rm -f "$ZC_ROOT/bin/zeroclaw.new" "$ZC_ROOT/bin/zerocode.new"
+        echo "$program could not run on this router; existing binaries were not replaced" >&2
+        exit 1
+    fi
+done
 if [ -x /etc/init.d/zeroclaw ]; then
     /etc/init.d/zeroclaw stop
 fi
 mv -f "$ZC_ROOT/bin/zeroclaw.new" "$ZC_ROOT/bin/zeroclaw"
+mv -f "$ZC_ROOT/bin/zerocode.new" "$ZC_ROOT/bin/zerocode"
 mkdir -p /usr/libexec /usr/bin /usr/share/zeroclaw /etc/init.d /etc/config
 cp "$BUNDLE/openwrt/files/zeroclaw-common.sh" /usr/libexec/zeroclaw-common.sh
 cp "$BUNDLE/openwrt/files/zeroclaw-prompt.sh" /usr/libexec/zeroclaw-prompt.sh
 cp "$BUNDLE/openwrt/files/openwrt-prompt.txt" /usr/share/zeroclaw/openwrt-prompt.txt
 cp "$BUNDLE/openwrt/files/zeroclaw" /usr/bin/zeroclaw
+cp "$BUNDLE/openwrt/files/zerocode" /usr/bin/zerocode
 cp "$BUNDLE/openwrt/files/zeroclaw.init" /etc/init.d/zeroclaw
-chmod 755 /usr/bin/zeroclaw /etc/init.d/zeroclaw
+chmod 755 /usr/bin/zeroclaw /usr/bin/zerocode /etc/init.d/zeroclaw
 if [ ! -f /etc/config/zeroclaw ]; then
     cp "$BUNDLE/openwrt/files/zeroclaw.config" /etc/config/zeroclaw
 fi
@@ -95,5 +99,6 @@ uci commit zeroclaw
 echo "Installed. Service remains stopped and disabled in UCI."
 echo "Config and runtime data: $ZC_STATE"
 echo "Next: zeroclaw quickstart"
+echo "Terminal interface: zerocode (official daemon client with saved sessions)"
 echo "Then: uci set zeroclaw.main.enabled=1; uci commit zeroclaw"
 echo "Then: /etc/init.d/zeroclaw enable; /etc/init.d/zeroclaw start"

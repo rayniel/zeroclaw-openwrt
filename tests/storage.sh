@@ -106,6 +106,7 @@ fi
 printf '%s\n' "$HOME|$*" > "$TEST_RUN"
 EOF
 chmod 700 "$ZC_ROOT/bin/zeroclaw"
+cp "$ZC_ROOT/bin/zeroclaw" "$ZC_ROOT/bin/zerocode"
 zc_check_binary "$ZC_ROOT/bin/zeroclaw"
 for TEST_FILE_ACCESS in 1000:0:700 0:0:755 0:0:600; do
     if zc_check_binary "$ZC_ROOT/bin/zeroclaw"; then
@@ -134,7 +135,7 @@ TEST_ALLOW_FAT=1
 TEST_ENABLED=1
 TEST_RUN="$TEST_DIR/run"
 TEST_STUB="$TEST_DIR/functions.sh"
-export ROOT FIXTURE TEST_MOUNT TEST_ALLOW_FAT TEST_ENABLED TEST_RUN TEST_STUB TEST_ACCESS TEST_FILE_ACCESS
+export ROOT TEST_DIR FIXTURE TEST_MOUNT TEST_ALLOW_FAT TEST_ENABLED TEST_RUN TEST_STUB TEST_ACCESS TEST_FILE_ACCESS
 cat > "$TEST_STUB" <<'EOF'
 config_load() { :; }
 config_get() {
@@ -167,6 +168,8 @@ sed -e 's|^\. /lib/functions.sh$|. "$TEST_STUB"|' \
     -e 's|^\. /usr/libexec/zeroclaw-common.sh$|. "$ROOT/openwrt/files/zeroclaw-common.sh"|' \
     -e 's|^zc_check_storage$|zc_check_storage "$FIXTURE"|' \
     "$ROOT/openwrt/files/zeroclaw" > "$TEST_DIR/launcher"
+sed 's|exec /usr/bin/zeroclaw |exec sh "$TEST_DIR/launcher" |' \
+    "$ROOT/openwrt/files/zerocode" > "$TEST_DIR/terminal"
 sed -e 's|^\. /usr/libexec/zeroclaw-common.sh$|. "$TEST_STUB"; . "$ROOT/openwrt/files/zeroclaw-common.sh"|' \
     -e 's@    zc_check_storage || {@    zc_check_storage "$FIXTURE" || {@' \
     "$ROOT/openwrt/files/zeroclaw.init" > "$TEST_DIR/init"
@@ -175,6 +178,10 @@ expect_runtime_failure() {
     rm -f "$TEST_RUN"
     if sh "$TEST_DIR/launcher" agent; then
         echo "FAIL: launcher must reject $1" >&2
+        exit 1
+    fi
+    if sh "$TEST_DIR/terminal" -a diagnostics; then
+        echo "FAIL: terminal client must reject $1" >&2
         exit 1
     fi
     if sh -c '. "$1"; start_service' sh "$TEST_DIR/init"; then
@@ -210,6 +217,18 @@ sh -c '. "$1"; start_service' sh "$TEST_DIR/init"
 grep -Fx 'command /usr/bin/zeroclaw --verbose daemon --host 127.0.0.1 --port 42617' "$TEST_RUN"
 sh "$TEST_DIR/launcher" agent
 grep -Fx "$ZC_ROOT/home|--config-dir $ZC_ROOT/config agent" "$TEST_RUN"
+for alias in diagnostics network-lab; do
+    sh "$TEST_DIR/terminal" -a "$alias"
+    grep -Fx "$ZC_ROOT/home|--config-dir $ZC_ROOT/config -a $alias" "$TEST_RUN"
+done
+mv "$ZC_ROOT/bin/zerocode" "$ZC_ROOT/bin/zerocode.saved"
+rm "$TEST_RUN"
+if sh "$TEST_DIR/terminal" -a diagnostics; then
+    echo "FAIL: missing terminal binary must not start another agent" >&2
+    exit 1
+fi
+[ ! -e "$TEST_RUN" ]
+mv "$ZC_ROOT/bin/zerocode.saved" "$ZC_ROOT/bin/zerocode"
 sh -c '. "$1"; service_triggers' sh "$TEST_DIR/init"
 grep -Fx "$ZC_MOUNT" "$TEST_RUN"
 
@@ -221,6 +240,7 @@ mkdir -p "$TEST_SYSTEM/etc" "$TEST_BUNDLE/openwrt/files" "$TEST_BUNDLE/bin"
 touch "$TEST_SYSTEM/etc/openwrt_release"
 cp "$ROOT/openwrt/files/"* "$TEST_BUNDLE/openwrt/files/"
 cp "$ZC_ROOT/bin/zeroclaw" "$TEST_BUNDLE/bin/zeroclaw"
+cp "$ZC_ROOT/bin/zerocode" "$TEST_BUNDLE/bin/zerocode"
 cat >> "$TEST_STUB" <<'EOF'
 id() { echo 0; }
 uname() { echo armv7l; }
@@ -245,7 +265,7 @@ sed -e 's|/etc/|$TEST_SYSTEM/etc/|g' \
     -e 's|^zc_check_storage$|zc_check_storage "$FIXTURE"|' \
     -e '2i\. "$TEST_STUB"' \
     "$ROOT/scripts/install.sh" > "$TEST_BUNDLE/install.sh"
-(cd "$TEST_BUNDLE" && sha256sum bin/zeroclaw openwrt/files/* > SHA256SUMS)
+(cd "$TEST_BUNDLE" && sha256sum bin/* openwrt/files/* > SHA256SUMS)
 TEST_MOUNT="$TEST_DIR/install-card/"
 ZC_MOUNT="${TEST_MOUNT%/}"
 mkdir -p "$ZC_MOUNT"
@@ -263,6 +283,8 @@ sh "$TEST_BUNDLE/install.sh" --allow-fat "$TEST_MOUNT"
 grep -Fx "set zeroclaw.main.mountpoint=$ZC_MOUNT" "$TEST_RUN"
 grep -Fx 'set zeroclaw.main.allow_fat=1' "$TEST_RUN"
 grep -Fx 'set zeroclaw.main.enabled=0' "$TEST_RUN"
+[ -x "$TEST_SYSTEM/usr/bin/zerocode" ]
+[ -x "$ZC_MOUNT/zeroclaw/bin/zerocode" ]
 if grep -Fx binary-chmod "$TEST_RUN"; then
     echo "FAIL: FAT must not depend on per-file chmod" >&2
     exit 1
@@ -293,4 +315,15 @@ for failure in execution permissions; do
     [ ! -e "$ZC_MOUNT/zeroclaw/bin/zeroclaw.new" ]
     [ ! -e "$TEST_RUN" ]
 done
+TEST_EXEC_FAIL=0
+TEST_FILE_ACCESS='0:0:700'
+printf '#!/bin/sh\nexit 9\n' > "$TEST_BUNDLE/bin/zerocode"
+(cd "$TEST_BUNDLE" && sha256sum bin/* openwrt/files/* > SHA256SUMS)
+if sh "$TEST_BUNDLE/install.sh" "$TEST_MOUNT"; then
+    echo "FAIL: a broken terminal client must not replace either installed binary" >&2
+    exit 1
+fi
+grep -Fx 'existing binary' "$ZC_MOUNT/zeroclaw/bin/zeroclaw"
+[ ! -e "$ZC_MOUNT/zeroclaw/bin/zeroclaw.new" ]
+[ ! -e "$ZC_MOUNT/zeroclaw/bin/zerocode.new" ]
 echo "Storage guard tests passed"

@@ -1,8 +1,8 @@
 #!/bin/sh
 set -eu
 
-if [ "$(id -u)" -ne 0 ] || [ "$#" -ne 1 ]; then
-    echo "Usage (Linux root): sh tests/image-mount.sh /path/to/ARMv7/zeroclaw" >&2
+if [ "$(id -u)" -ne 0 ] || [ "$#" -ne 2 ]; then
+    echo "Usage (Linux root): sh tests/image-mount.sh /path/to/ARMv7/zeroclaw /path/to/ARMv7/zerocode" >&2
     exit 1
 fi
 BIN="$1"
@@ -81,6 +81,7 @@ printf '%s\n' user-customized > "$STATE/config/agents/prompt_test/workspace/AGEN
 zc_seed_openwrt_prompt prompt_test "$ROOT/openwrt/files/openwrt-prompt.txt"
 grep -Fx user-customized "$STATE/config/agents/prompt_test/workspace/AGENTS.md"
 echo "Real ARM configuration and OpenWrt prompt seeding checks passed"
+python3 "$ROOT/tests/terminal-runtime.py" "$BIN" "$2" "$STATE"
 umount "$STATE"
 zc_check_storage
 grep -Fx persisted "$STATE/persisted"

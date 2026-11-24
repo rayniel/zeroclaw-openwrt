@@ -29,8 +29,10 @@ PREFIX="${CC_TARGET%gcc}"
 export PATH="$(dirname "$CC_TARGET"):$PATH"
 export CARGO_TARGET_ARMV7_UNKNOWN_LINUX_MUSLEABIHF_LINKER="$CC_TARGET"
 export CC_armv7_unknown_linux_musleabihf="$CC_TARGET"
+export CXX_armv7_unknown_linux_musleabihf="${PREFIX}g++"
 export AR_armv7_unknown_linux_musleabihf="${PREFIX}ar"
 export CFLAGS_armv7_unknown_linux_musleabihf="-Os -mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard"
+export CXXFLAGS_armv7_unknown_linux_musleabihf="$CFLAGS_armv7_unknown_linux_musleabihf"
 export CARGO_TARGET_ARMV7_UNKNOWN_LINUX_MUSLEABIHF_RUSTFLAGS="-C target-cpu=cortex-a7 -C target-feature=+crt-static -C link-arg=-static"
 
 "$CC_TARGET" -mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard \
@@ -77,34 +79,40 @@ test "$(git -C upstream rev-parse HEAD)" = "$UPSTREAM_COMMIT"
 cargo "+$RUST_VERSION" build --manifest-path upstream/Cargo.toml \
     --locked --release --target "$RUST_TARGET" --bin zeroclaw \
     --no-default-features --features "$FEATURES"
+cargo "+$RUST_VERSION" build --manifest-path upstream/apps/zerocode/Cargo.toml \
+    --locked --release --target "$RUST_TARGET" --bin zerocode --no-default-features
 BIN="$ROOT/upstream/target/$RUST_TARGET/release/zeroclaw"
-file "$BIN" | tee dist/binary-info.txt
-"${PREFIX}readelf" -h -A -l -d "$BIN" >> dist/binary-info.txt
-grep -Eq 'Class: +ELF32' dist/binary-info.txt
-grep -Eq 'Machine: +ARM' dist/binary-info.txt
-grep -q 'Tag_ABI_VFP_args: VFP registers' dist/binary-info.txt
-if grep -q INTERP dist/binary-info.txt; then
-    echo "Unexpected ELF dynamic interpreter; refusing to publish" >&2
-    exit 1
-fi
-if grep -q NEEDED dist/binary-info.txt; then
-    echo "Unexpected shared-library dependency; refusing to publish" >&2
-    exit 1
-fi
-qemu-arm -cpu cortex-a7 "$BIN" --version | tee -a dist/binary-info.txt
+TERMINAL_BIN="$ROOT/upstream/target/$RUST_TARGET/release/zerocode"
+check_binary() {
+    local binary="$1" report="$2"
+    file "$binary" | tee "$report"
+    "${PREFIX}readelf" -h -A -l -d "$binary" >> "$report"
+    grep -Eq 'Class: +ELF32' "$report"
+    grep -Eq 'Machine: +ARM' "$report"
+    grep -q 'Tag_ABI_VFP_args: VFP registers' "$report"
+    if grep -Eq 'INTERP|NEEDED' "$report"; then
+        echo "Unexpected dynamic dependency in $binary; refusing to publish" >&2
+        exit 1
+    fi
+    qemu-arm -cpu cortex-a7 "$binary" --version | tee -a "$report"
+}
+check_binary "$BIN" dist/binary-info.txt
+check_binary "$TERMINAL_BIN" dist/terminal-binary-info.txt
 qemu-arm -cpu cortex-a7 "$BIN" --help > dist/cli-info.txt
 qemu-arm -cpu cortex-a7 "$BIN" --verbose daemon --help >> dist/cli-info.txt
 qemu-arm -cpu cortex-a7 "$BIN" quickstart --help >> dist/cli-info.txt
-sudo sh tests/image-mount.sh "$BIN"
+qemu-arm -cpu cortex-a7 "$TERMINAL_BIN" --help >> dist/cli-info.txt
+sudo sh tests/image-mount.sh "$BIN" "$TERMINAL_BIN"
 
 BUNDLE="$ROOT/dist/bundle"
 mkdir -p "$BUNDLE/bin" "$BUNDLE/openwrt" "$BUNDLE/licenses"
 install -m 755 "$BIN" "$BUNDLE/bin/zeroclaw"
+install -m 755 "$TERMINAL_BIN" "$BUNDLE/bin/zerocode"
 cp -R openwrt/files "$BUNDLE/openwrt/"
 install -m 755 scripts/install.sh "$BUNDLE/install.sh"
 install -m 755 scripts/run-test.sh "$BUNDLE/run-test.sh"
 install -m 755 scripts/prepare-state-image.sh "$BUNDLE/prepare-state-image.sh"
-cp README.md LICENSE dist/build-info.txt dist/binary-info.txt "$BUNDLE/"
+cp README.md LICENSE dist/build-info.txt dist/binary-info.txt dist/terminal-binary-info.txt "$BUNDLE/"
 cp upstream/LICENSE* "$BUNDLE/licenses/"
 (
     cd "$BUNDLE"
@@ -121,10 +129,11 @@ tar -czf "dist/$ARCHIVE" -C "$BUNDLE" .
 {
     echo "### Build artifacts"
     echo "- ZeroClaw $UPSTREAM_VERSION, static ARMv7 musl hard-float ABI, Cortex-A7"
+    echo "- Official ZeroCode terminal client, same pinned upstream revision and ABI"
     echo "- Features: $FEATURES"
     echo "- MMC deployment archive and small OpenWrt APK integration package"
     echo "- QEMU CLI smoke test passed; real-router operation is NOT yet verified."
     echo '```'
-    du -h "$BIN" "dist/$ARCHIVE"
+    du -h "$BIN" "$TERMINAL_BIN" "dist/$ARCHIVE"
     echo '```'
 } | tee -a "${GITHUB_STEP_SUMMARY:-/dev/stdout}"

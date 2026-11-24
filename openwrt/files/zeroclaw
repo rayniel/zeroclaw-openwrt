@@ -14,6 +14,11 @@ export XDG_CACHE_HOME="$ZC_STATE/home/.cache"
 mkdir -p "$HOME" "$ZC_STATE/config"
 cd "$ZC_STATE"
 case "${1:-}" in
+    openwrt-terminal)
+        shift
+        zc_check_binary "$ZC_ROOT/bin/zerocode"
+        exec "$ZC_ROOT/bin/zerocode" --config-dir "$ZC_STATE/config" "$@"
+        ;;
     quickstart)
         for zc_argument in "$@"; do
             case "$zc_argument" in

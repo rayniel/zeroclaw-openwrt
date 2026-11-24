@@ -27,16 +27,19 @@ OpenWrt 的 Rust 映射也在启用 FPU 时选择 `musleabihf`，不能只按 SD
 沿用上游尺寸优化，CI 将 LTO 改为 thin，并限制两个编译任务。
 缓存 Cargo 下载和编译目录，失败后也保留可复用的编译结果。
 
+同一固定上游提交同时编译 `zeroclaw` 和官方终端客户端 `zerocode`，
+两者都检查静态 ARMv7 ELF 和 QEMU CLI 启动。尚未验证真实路由器上同时运行两者的 RAM 占用。
+
 成功后下载 Actions artifact，其中包含：
 
 | 文件 | 用途 |
 | --- | --- |
-| `zeroclaw-0.9.0-openwrt-ipq4019.tar.gz` | ARMv7 程序、安装器和启动脚本 |
+| `zeroclaw-0.9.0-openwrt-ipq4019.tar.gz` | ARMv7 ZeroClaw、ZeroCode、安装器和启动脚本 |
 | `zeroclaw-openwrt-*.apk` | 仅启动脚本、UCI 和 CLI 包装器的小型 OpenWrt 集成包 |
 | `SHA256SUMS` | 归档和 APK 的校验值 |
 | `*-info.txt` | 上游提交、特性、工具链和 ELF/CLI 检查记录 |
 
-**APK 不包含大体积的 ZeroClaw 程序**，以免占满内置 overlay。
+**APK 不包含大体积的 ZeroClaw / ZeroCode 程序**，以免占满内置 overlay。
 首版推荐使用下面的归档安装器；APK 为需要包管理器管理集成文件的用户提供，
 不要同时使用两种方式管理相同的 `/etc`、`/usr` 文件。
 没有配置自动追踪上游、自动发布 Release 或自动安装到路由器。
@@ -106,11 +109,12 @@ opkg 固件使用对应的 `opkg install`，不要混用包管理器。首次创
 ```sh
 sh unpack/install.sh --fat-image /mnt/mmcblk0p1/
 zeroclaw quickstart
-zeroclaw agent
+zerocode
 ```
 
-首次创建需要卡内额外 256 MiB、程序更新空间和 16 MiB 余量。当前主程序约 37 MiB，
-约 15 MiB 是压缩包大小，均不是运行 RAM 占用。镜像占用卡空间，不会整块载入 RAM。
+首次创建需要卡内额外 256 MiB、两个程序的更新空间和 16 MiB 余量。加入 ZeroCode 后，
+程序及压缩包均比旧版更大，以产物内的检查记录和实际文件为准；磁盘大小不是运行 RAM 占用。
+镜像占用卡空间，不会整块载入 RAM。
 该大小为初始固定容量，不会自动扩容；数据库等仍可能填满镜像。
 重复安装复用现有镜像，绝不重新格式化或覆盖它；已有裸 FAT 配置及 `zeroclaw-test`
 测试数据也不会自动迁移或删除。首次切换后重新 quickstart，或自行审核并迁移配置。
@@ -226,7 +230,41 @@ zeroclaw openwrt-prompt ops
 不会经过这一 CLI 包装器；需要默认提示词时使用上面的显式命令。
 若提示词写入失败，quickstart 已创建的 agent 不会回滚，应修复文件/挂载问题后再显式应用。
 
-确认前台命令可用后，启用常驻服务：
+### 官方终端聊天与自动保存
+
+在 OpenWrt 的 SSH 终端运行：
+
+```sh
+zerocode
+```
+
+这是官方 ZeroCode 终端界面，不是另一个 `zeroclaw agent`。默认打开配置界面，
+在 Chat 中选择已创建的任意 agent；也可用 `zerocode -a <agent名称>` 直接进入该 agent 的聊天。
+agent 名称不固定，不假设存在 `ops`，也不自动替你创建或切换 risk profile。
+
+包装器与 init 共用已验证的 MMC 状态存储、HOME 和 `--config-dir`，
+因此通过官方本地 Unix socket 连接同一 daemon，无需手工填写端口或会话文件路径。
+已有 daemon 就连接它；没有运行时，由官方客户端启动临时 daemon。
+临时 daemon 不是 procd 常驻服务；退出界面后是否继续后台运行遵循上游生命周期，
+需要持续运行的渠道/定时任务应显式启用下面的 init 服务。
+
+聊天由官方 daemon 的会话机制自动持久化。使用 **Ctrl+S** 打开历史会话列表，
+或在 Chat 中使用 **`/load-session`** 恢复已保存的聊天；**Ctrl+N** 新建会话。
+自动保存不代表每次启动都自动选择上一次会话；新建会话也不会自动包含其他会话的内容。
+已有 CLI `--session-state-file` JSON 不会自动导入 ZeroCode，会继续保留供原命令使用。
+官方操作说明见固定版本的
+[ZeroCode 文档](https://github.com/zeroclaw-labs/zeroclaw/blob/6c78ba59bce6a3d5079cf0c0310488770e264ad4/docs/book/src/zerocode/running.md)。
+
+`zeroclaw agent -a <agent名称>` 仍保持官方独立 CLI 行为；包装器不偷偷添加会话文件参数。
+直接运行卡上原始二进制或旧式 `run-test.sh` 不会得到本包的 ZeroCode 存储守卫。
+裸 FAT 不适合 Unix socket 和持久化运行，请使用 ext4 或 `--fat-image`。
+终端须支持交互式 TUI 和 UTF-8，中文显示依赖 SSH 客户端字体。
+ZeroCode 和 daemon 是两个进程，128 MiB 路由器上应先观察内存、响应和网络稳定性，
+不能仅凭 QEMU 通过就认定实际设备可用；不自动安装 swap 或放开网络访问。
+
+### 可选的 init 常驻服务
+
+仅希望在 SSH 中按需聊天时，无须先启用 init。需要常驻运行时再执行：
 
 ```sh
 uci set zeroclaw.main.enabled='1'
@@ -246,12 +284,14 @@ logread -e zeroclaw
 | 路径 | 用途 |
 | --- | --- |
 | `/mnt/mmcblk0p1/zeroclaw/bin/zeroclaw` | 真正的 ARMv7 可执行程序 |
+| `/mnt/mmcblk0p1/zeroclaw/bin/zerocode` | 官方 ARMv7 终端客户端 |
 | `/mnt/mmcblk0p1/zeroclaw/config` | 上游配置目录，可能包含密钥 |
 | `/mnt/mmcblk0p1/zeroclaw/home` | 隔离的 HOME / XDG 数据、缓存目录 |
 | `/mnt/mmcblk0p1/zeroclaw/state.ext4` | 镜像模式：256 MiB ext4 普通文件 |
 | `/mnt/mmcblk0p1/zeroclaw/state` | 镜像模式：loop 挂载点，内含 `config`、`home` |
 | `/etc/config/zeroclaw` | 挂载路径、存储模式、FAT 兼容开关、服务开关、监听端口，不放 API Key |
 | `/usr/bin/zeroclaw` | 挂载检查和路径设置包装器 |
+| `/usr/bin/zerocode` | 共用存储检查、配置目录及 HOME 的终端入口 |
 | `/etc/init.d/zeroclaw` | procd 开机启动、异常重启及日志接管 |
 
 服务通过 `--verbose` 将事件同时输出到终端，由 procd 接管 stdout/stderr，
@@ -271,8 +311,8 @@ logread -e zeroclaw
 
 ## APK 集成包（可选替代方式）
 
-只适用于确认使用 APK 的目标固件。先把归档内的 `bin/zeroclaw` 放到
-卡上 `zeroclaw/bin/zeroclaw` 并赋予执行权限，再安装**本仓库构建且已校验**的 APK。
+只适用于确认使用 APK 的目标固件。先把归档内的 `bin/zeroclaw`、`bin/zerocode` 放到
+卡上 `zeroclaw/bin/` 并赋予执行权限，再安装**本仓库构建且已校验**的 APK。
 该本地包未由 OpenWrt 官方密钥签名，仅对这次安装使用：
 
 ```sh

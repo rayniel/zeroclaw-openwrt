@@ -152,6 +152,7 @@ sed -e "s@/proc/mounts@$FIXTURE@g" -e "s@/sys/block@$SYSFS@g" \
     "$ROOT/openwrt/files/zeroclaw-common.sh" > "$BUNDLE/openwrt/files/zeroclaw-common.sh"
 cp "$ROOT/openwrt/files/zeroclaw.config" "$BUNDLE/openwrt/files/"
 cp "$ROOT/openwrt/files/zeroclaw" "$BUNDLE/openwrt/files/"
+cp "$ROOT/openwrt/files/zerocode" "$BUNDLE/openwrt/files/"
 cp "$ROOT/openwrt/files/zeroclaw.init" "$BUNDLE/openwrt/files/"
 cp "$ROOT/openwrt/files/zeroclaw-prompt.sh" "$BUNDLE/openwrt/files/"
 cp "$ROOT/openwrt/files/openwrt-prompt.txt" "$BUNDLE/openwrt/files/"
@@ -165,7 +166,8 @@ cat > "$BUNDLE/bin/zeroclaw" <<'EOF'
 printf '%s\n' "$HOME|$PWD|$*" >> "$RECORD"
 EOF
 chmod 755 "$BUNDLE/bin/zeroclaw"
-(cd "$BUNDLE" && sha256sum bin/zeroclaw openwrt/files/* > SHA256SUMS)
+cp "$BUNDLE/bin/zeroclaw" "$BUNDLE/bin/zerocode"
+(cd "$BUNDLE" && sha256sum bin/* openwrt/files/* > SHA256SUMS)
 touch "$SYSTEM/etc/openwrt_release"
 rm -f "$ZC_IMAGE" "$RECORD"
 parent
@@ -236,11 +238,14 @@ sed -e 's|^\. /usr/libexec/zeroclaw-common.sh$|. "$STUB"; . "$BUNDLE/openwrt/fil
 export BUNDLE
 sh "$TEST_DIR/launcher" agent
 grep -Fx "$ZC_STATE/home|$ZC_STATE|--config-dir $ZC_STATE/config agent" "$RECORD"
+sh "$TEST_DIR/launcher" openwrt-terminal -a network-lab
+grep -Fx "$ZC_STATE/home|$ZC_STATE|--config-dir $ZC_STATE/config -a network-lab" "$RECORD"
 sh -c '. "$1"; start_service' sh "$TEST_DIR/init"
 grep -Fx 'command /usr/bin/zeroclaw --verbose daemon --host 127.0.0.1 --port 42617' "$RECORD"
 parent ro
 rm -f "$RECORD"
-if sh "$TEST_DIR/launcher" agent || sh -c '. "$1"; start_service' sh "$TEST_DIR/init"; then
+if sh "$TEST_DIR/launcher" agent || sh "$TEST_DIR/launcher" openwrt-terminal || \
+    sh -c '. "$1"; start_service' sh "$TEST_DIR/init"; then
     echo "FAIL: runtime must reject a read-only card" >&2
     exit 1
 fi
