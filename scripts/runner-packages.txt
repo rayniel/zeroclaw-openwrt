@@ -2,6 +2,8 @@ build-essential
 bison
 clang
 cmake
+dosfstools
+e2fsprogs
 file
 flex
 gawk

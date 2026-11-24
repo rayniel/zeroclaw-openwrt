@@ -34,11 +34,15 @@ jobs:
         run: |
           bash -n scripts/build.sh
           sh -n scripts/install.sh
+          sh -n scripts/run-test.sh
+          sh -n scripts/prepare-state-image.sh
           shellcheck -S warning -s sh -e SC1091,SC2034,SC3043 \
-            scripts/install.sh openwrt/files/zeroclaw \
+            scripts/install.sh scripts/run-test.sh scripts/prepare-state-image.sh openwrt/files/zeroclaw \
             openwrt/files/zeroclaw.init openwrt/files/zeroclaw-common.sh \
-            tests/storage.sh
+            tests/storage.sh tests/run-test.sh tests/image-storage.sh tests/image-mount.sh
           sh tests/storage.sh
+          sh tests/run-test.sh
+          sh tests/image-storage.sh
       - name: Restore Cargo build cache
         id: cargo-cache
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4

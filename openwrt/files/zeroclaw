@@ -7,10 +7,10 @@ zc_load_paths
 zc_check_storage
 zc_check_binary "$ZC_ROOT/bin/zeroclaw"
 umask 077
-export HOME="$ZC_ROOT/home"
-export XDG_CONFIG_HOME="$ZC_ROOT/home/.config"
-export XDG_DATA_HOME="$ZC_ROOT/home/.local/share"
-export XDG_CACHE_HOME="$ZC_ROOT/home/.cache"
-mkdir -p "$HOME" "$ZC_ROOT/config"
-cd "$ZC_ROOT"
-exec "$ZC_ROOT/bin/zeroclaw" --config-dir "$ZC_ROOT/config" "$@"
+export HOME="$ZC_STATE/home"
+export XDG_CONFIG_HOME="$ZC_STATE/home/.config"
+export XDG_DATA_HOME="$ZC_STATE/home/.local/share"
+export XDG_CACHE_HOME="$ZC_STATE/home/.cache"
+mkdir -p "$HOME" "$ZC_STATE/config"
+cd "$ZC_STATE"
+exec "$ZC_ROOT/bin/zeroclaw" --config-dir "$ZC_STATE/config" "$@"

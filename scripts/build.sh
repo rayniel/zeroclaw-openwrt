@@ -94,17 +94,21 @@ qemu-arm -cpu cortex-a7 "$BIN" --version | tee -a dist/binary-info.txt
 qemu-arm -cpu cortex-a7 "$BIN" --help > dist/cli-info.txt
 qemu-arm -cpu cortex-a7 "$BIN" --verbose daemon --help >> dist/cli-info.txt
 qemu-arm -cpu cortex-a7 "$BIN" quickstart --help >> dist/cli-info.txt
+sudo sh tests/image-mount.sh "$BIN"
 
 BUNDLE="$ROOT/dist/bundle"
 mkdir -p "$BUNDLE/bin" "$BUNDLE/openwrt" "$BUNDLE/licenses"
 install -m 755 "$BIN" "$BUNDLE/bin/zeroclaw"
 cp -R openwrt/files "$BUNDLE/openwrt/"
 install -m 755 scripts/install.sh "$BUNDLE/install.sh"
+install -m 755 scripts/run-test.sh "$BUNDLE/run-test.sh"
+install -m 755 scripts/prepare-state-image.sh "$BUNDLE/prepare-state-image.sh"
 cp README.md LICENSE dist/build-info.txt dist/binary-info.txt "$BUNDLE/"
 cp upstream/LICENSE* "$BUNDLE/licenses/"
 (
     cd "$BUNDLE"
-    find bin openwrt licenses -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+    find bin openwrt licenses install.sh run-test.sh prepare-state-image.sh \
+        -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
 )
 ARCHIVE="zeroclaw-${UPSTREAM_VERSION}-openwrt-ipq4019.tar.gz"
 tar -czf "dist/$ARCHIVE" -C "$BUNDLE" .

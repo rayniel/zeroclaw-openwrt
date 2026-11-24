@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zeroclaw-openwrt
 PKG_VERSION:=0.9.0
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 PKG_LICENSE:=MIT
 PKGARCH:=all
 
@@ -17,7 +17,8 @@ endef
 
 define Package/zeroclaw-openwrt/description
   Small integration package only. Install the separately built ARMv7
-  binary on mounted Linux-formatted MMC storage before enabling it.
+  binary on mounted MMC storage before enabling it. FAT-backed storage
+  can use an explicitly prepared ext4 loop image for config and data.
 endef
 
 define Package/zeroclaw-openwrt/conffiles

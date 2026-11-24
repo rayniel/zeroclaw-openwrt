@@ -46,7 +46,7 @@ OpenWrt 的 Rust 映射也在启用 FPU 时选择 `musleabihf`，不能只按 SD
 卡须已稳定挂载到 `/mnt/mmcblk0p1`，**推荐使用 ext4** 等支持 Linux 权限的文件系统，
 且不是只读或 `noexec` 挂载。**不要直接格式化已有卡**，先确认并备份内容。
 C10 只描述顺序写入等级；随机写入性能、健康和寿命仍需实际观察。
-默认拒绝 FAT/exFAT；只有下面的显式兼容模式允许 vfat/exFAT。
+默认拒绝 FAT/exFAT；推荐使用下面的 `--fat-image` 模式，将 Unix 运行数据放入卡上的 ext4 镜像。
 所有模式都拒绝 tmpfs、未挂载目录、只读和 `noexec` 挂载，不会自动重挂载或格式化。
 
 确认固件的包管理器，安装 HTTPS 根证书，并校准系统时间。
@@ -75,13 +75,76 @@ zeroclaw quickstart
 
 安装器检查卡内剩余空间、归档内文件校验和及程序能否执行，然后才替换程序。
 首次和升级安装后都保持 UCI 的 `enabled=0`，不会自动运行智能体。
-已有 UCI 配置除挂载路径、FAT 兼容开关及启用状态外保留；已有模型密钥和运行数据不会覆盖。
+已有 UCI 配置除挂载路径、存储模式、FAT 兼容开关及启用状态外保留；已有模型密钥和运行数据不会覆盖。
 如需变更挂载点，传入 `sh unpack/install.sh /你的/挂载点`（允许末尾 `/`）；
 需同时自行保证 OpenWrt 的持久挂载配置正确。
 
-### vfat/exFAT 显式兼容模式
+### vfat/exFAT + ext4 镜像（推荐兼容模式）
+
+保留卡的 vfat/exFAT 格式，不格式化整张卡。安装器只在卡上新建一个 **256 MiB**
+普通文件 `zeroclaw/state.ext4`，将它格式化为 ext4 并通过 loop 挂载到 `zeroclaw/state`。
+主程序仍放在外层卡的 `zeroclaw/bin`；HOME、配置、加密密钥、数据库、内部工作区和缓存
+都使用镜像内的路径。内置可写 overlay 只放小型启动脚本及 UCI，不放大程序或运行数据；
+OpenWrt 的 `/rom` 通常只读。
+
+先确认固件提供 vfat/exFAT、loop 和 ext4 支持。APK 固件可安装：
+
+```sh
+apk add kmod-loop kmod-fs-ext4 e2fsprogs
+```
+
+opkg 固件使用对应的 `opkg install`，不要混用包管理器。首次创建需要 `mkfs.ext4`，
+运行时需要支持 `-o loop` 的 `mount`、可用 loop 设备和 `/sys/block`；
+内核模块须与当前固件版本匹配，不能强装不匹配的 kmod。安装依赖仍占内置空间，
+先用 `df -h / /overlay /mnt/mmcblk0p1` 检查余量。
+
+外层卡须已经可写、允许执行并持久挂载，但镜像模式不要求 FAT 的 `fmask/dmask=0077`。
+如需电脑直接读写资料，可继续存放在外层卡上；不要给不可信本地用户写入程序或镜像的权限。
+将包含此模式的新归档解开后运行：
+
+```sh
+sh unpack/install.sh --fat-image /mnt/mmcblk0p1/
+zeroclaw quickstart
+zeroclaw agent
+```
+
+首次创建需要卡内额外 256 MiB、程序更新空间和 16 MiB 余量。当前主程序约 37 MiB，
+约 15 MiB 是压缩包大小，均不是运行 RAM 占用。镜像占用卡空间，不会整块载入 RAM。
+该大小为初始固定容量，不会自动扩容；数据库等仍可能填满镜像。
+重复安装复用现有镜像，绝不重新格式化或覆盖它；已有裸 FAT 配置及 `zeroclaw-test`
+测试数据也不会自动迁移或删除。首次切换后重新 quickstart，或自行审核并迁移配置。
+
+安装器保存 `storage_mode=image`，并保持服务关闭。后续 CLI/procd 启动只挂载**已有**镜像，
+不自动创建或格式化。检查外层精确挂载点、镜像为普通文件、内层为可写可执行的 ext4、
+`nosuid,nodev`、root 所有权与 `0700` 权限，还通过 sysfs 验证 loop 的 backing file。
+镜像缺失、损坏、错误挂载、只读、无卡或依赖缺失时拒绝运行，不回退写入 flash 或裸 FAT。
+后续仍用常规安装命令升级，会沿用已保存的存储模式。
+
+**风险与运维：** 镜像不是加密磁盘；拥有外层 FAT 卡访问权的人仍可复制、读取或修改镜像，
+加密密钥与配置在同一镜像里，也不能保证拔卡后的保密性。外层 FAT 无日志，
+断电、热拔卡、卡故障仍会影响镜像及数据库；ext4 的日志并不能消除这些风险。
+电脑可直接访问外层资料，但普通 Windows 不能直接打开镜像内文件。
+先在真实路由器验证，定期备份；不要承诺所有工具均可正常运行。
+
+拔卡或复制一致的镜像备份前，停止服务，退出卡目录并依次卸载内层、外层：
+
+```sh
+/etc/init.d/zeroclaw stop
+cd /
+umount /mnt/mmcblk0p1/zeroclaw/state &&
+    umount /mnt/mmcblk0p1
+```
+
+如果 busy，先停止其他卡访问，不使用强制或 lazy 卸载，不热拔卡。不要把正在使用的
+镜像当作普通文件在线复制备份。失败后安装器可能留下已创建的镜像供重试，不会自动删除数据。
+若锁目录在异常断电后残留，应先确认没有安装或挂载进程，再手动清理明确的锁目录。
+
+### 裸 vfat/exFAT 的旧式显式兼容模式（有限支持）
 
 为了保留电脑直接读写能力，可以使用 vfat 或 exFAT，但**不保证 ZeroClaw 全功能正常**。
+固定的上游版本首次保存加密密钥会使用硬链接，裸 FAT 不支持这一操作，
+因此即使权限检查通过，quickstart 仍可能报 `Failed to encrypt providers.models.api_key`。
+完整配置/运行请使用上面的镜像模式，不通过关闭加密来掩盖此限制。
 先备份，并自行配置持久挂载选项，例如 `rw,exec,uid=0,gid=0,umask=0077`；
 也可以使用 `fmask=0077,dmask=0077`。固件须有相应文件系统驱动。
 `fmask` 和 `dmask` 分别覆盖 `umask`，两者的有效值都须为 `0077`，
@@ -110,6 +173,25 @@ root-only 只限制当前路由器上的非 root 访问，拔卡接电脑后仍�
 数据库、文件锁、断电恢复及长期可靠性也需真实验证；尤其 exFAT 缺少日志，
 不要热拔卡。需要这些保证时，应迁移到 ext4。
 
+### 不改挂载权限的临时前台测试
+
+如果暂时不能修改卡的挂载权限，可以将 `run-test.sh` 放在卡上已解开的
+归档目录中（与 `install.sh` 同级），绕过 FAT 掩码及实际 root-only 权限检查：
+
+```sh
+sh unpack/run-test.sh /mnt/mmcblk0p1/ --version
+```
+
+脚本直接运行归档里的程序，不执行安装器，不更改 UCI、服务或系统文件，也不重启、
+重挂载路由器。它仍检查归档校验和、绝对挂载点、已挂载、可写及可执行，
+要求归档本身位于该卡上。测试配置及 HOME 独立放在卡上的 `zeroclaw-test`，
+不会覆盖正式安装的数据。不指定 ZeroClaw 参数时默认运行 `--version`。
+
+**这不是安全安装模式：** 当前路由器上的其他用户及电脑可能读取测试 API Key，
+普通用户也可能修改程序和配置；仅在可信、受控环境临时测试，结束后撤销测试密钥。
+裸 FAT 的加密密钥保存仍可能失败，跳过脚本检查并不提供硬链接支持；
+完整 quickstart/运行应改用镜像模式。正式安装和服务的权限检查不变。
+
 使用引导配置远程模型提供商、模型及 API Key。不要将密钥放进仓库、
 Actions 输入或日志。配置、HOME、默认工作数据应留在卡上；
 如果引导或自定义配置要求选择工作区，也应明确指定卡内路径。
@@ -137,7 +219,9 @@ logread -e zeroclaw
 | `/mnt/mmcblk0p1/zeroclaw/bin/zeroclaw` | 真正的 ARMv7 可执行程序 |
 | `/mnt/mmcblk0p1/zeroclaw/config` | 上游配置目录，可能包含密钥 |
 | `/mnt/mmcblk0p1/zeroclaw/home` | 隔离的 HOME / XDG 数据、缓存目录 |
-| `/etc/config/zeroclaw` | 挂载路径、FAT 兼容开关、服务开关、监听端口，不放 API Key |
+| `/mnt/mmcblk0p1/zeroclaw/state.ext4` | 镜像模式：256 MiB ext4 普通文件 |
+| `/mnt/mmcblk0p1/zeroclaw/state` | 镜像模式：loop 挂载点，内含 `config`、`home` |
+| `/etc/config/zeroclaw` | 挂载路径、存储模式、FAT 兼容开关、服务开关、监听端口，不放 API Key |
 | `/usr/bin/zeroclaw` | 挂载检查和路径设置包装器 |
 | `/etc/init.d/zeroclaw` | procd 开机启动、异常重启及日志接管 |
 
@@ -167,6 +251,9 @@ apk add --allow-untrusted ./zeroclaw-openwrt-*.apk
 ```
 
 不要全局关闭签名检查。随后执行相同的 `zeroclaw quickstart` 和 UCI 启用步骤。
+镜像模式须先用归档中的 `prepare-state-image.sh` 显式准备镜像，再设置
+`uci set zeroclaw.main.storage_mode='image'; uci commit zeroclaw`；
+不要直接创建配置在裸 FAT 上，不要指望 APK 自动创建或格式化镜像。
 卸载集成包不会删除卡上的配置、密钥或数据库；这些数据需要自行安全管理。
 
 本仓库脚本使用 MIT 许可；上游程序的许可文件随归档附带。

@@ -241,6 +241,7 @@ EOF
 sed -e 's|/etc/|$TEST_SYSTEM/etc/|g' \
     -e 's|/usr/|$TEST_SYSTEM/usr/|g' \
     -e 's|^\. /lib/functions.sh$|. "$TEST_STUB"|' \
+    -e 's|^zc_check_parent_storage$|zc_check_parent_storage "$FIXTURE"|' \
     -e 's|^zc_check_storage$|zc_check_storage "$FIXTURE"|' \
     -e '2i\. "$TEST_STUB"' \
     "$ROOT/scripts/install.sh" > "$TEST_BUNDLE/install.sh"
