@@ -41,6 +41,7 @@ qemu-arm -cpu cortex-a7 .sdk/abi-probe
 
 cp -R openwrt "$SDK/package/zeroclaw-openwrt"
 (
+    unset STAGING_DIR
     cd "$SDK"
     ./scripts/feeds update -a
     ./scripts/feeds install ca-bundle
