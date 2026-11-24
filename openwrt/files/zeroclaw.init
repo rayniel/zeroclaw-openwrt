@@ -28,7 +28,7 @@ start_service() {
         return 1
     fi
     procd_open_instance
-    procd_set_param command /usr/bin/zeroclaw daemon --host 127.0.0.1 --port "$port"
+    procd_set_param command /usr/bin/zeroclaw --verbose daemon --host 127.0.0.1 --port "$port"
     procd_set_param respawn 3600 10 5
     procd_set_param stdout 1
     procd_set_param stderr 1

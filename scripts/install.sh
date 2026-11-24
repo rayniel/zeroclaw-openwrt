@@ -58,6 +58,6 @@ uci set zeroclaw.main.mountpoint="$ZC_MOUNT"
 uci set zeroclaw.main.enabled='0'
 uci commit zeroclaw
 echo "Installed. Service remains stopped and disabled in UCI."
-echo "Next: zeroclaw onboard"
+echo "Next: zeroclaw quickstart"
 echo "Then: uci set zeroclaw.main.enabled=1; uci commit zeroclaw"
 echo "Then: /etc/init.d/zeroclaw enable; /etc/init.d/zeroclaw start"

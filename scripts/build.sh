@@ -92,7 +92,8 @@ if grep -q NEEDED dist/binary-info.txt; then
 fi
 qemu-arm -cpu cortex-a7 "$BIN" --version | tee -a dist/binary-info.txt
 qemu-arm -cpu cortex-a7 "$BIN" --help > dist/cli-info.txt
-qemu-arm -cpu cortex-a7 "$BIN" daemon --help >> dist/cli-info.txt
+qemu-arm -cpu cortex-a7 "$BIN" --verbose daemon --help >> dist/cli-info.txt
+qemu-arm -cpu cortex-a7 "$BIN" quickstart --help >> dist/cli-info.txt
 
 BUNDLE="$ROOT/dist/bundle"
 mkdir -p "$BUNDLE/bin" "$BUNDLE/openwrt" "$BUNDLE/licenses"

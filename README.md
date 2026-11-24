@@ -4,7 +4,8 @@
 IPQ4019 / Cortex-A7 / ARMv7、OpenWrt 25.12.4 `ipq40xx/generic`。
 模型推理使用远程 API，不在路由器上部署大模型。
 
-**当前状态：构建适配中，尚未通过真实路由器运行验证。**
+**当前状态：已打通 GitHub Actions 交叉编译、QEMU CLI 检查和 APK 打包，
+尚未通过真实路由器运行验证。**
 CI 的 QEMU 检查只覆盖 CLI 启动，不能证明路由器上的内存占用、
 联网、数据库、渠道和长期稳定性。
 
@@ -68,7 +69,7 @@ mkdir -p unpack
 tar -xzf zeroclaw-0.9.0-openwrt-ipq4019.tar.gz -C unpack
 sh unpack/install.sh
 zeroclaw --version
-zeroclaw onboard
+zeroclaw quickstart
 ```
 
 安装器检查卡内剩余空间、归档内文件校验和及程序能否执行，然后才替换程序。
@@ -108,7 +109,8 @@ logread -e zeroclaw
 | `/usr/bin/zeroclaw` | 挂载检查和路径设置包装器 |
 | `/etc/init.d/zeroclaw` | procd 开机启动、异常重启及日志接管 |
 
-使用 `logread` 查看 procd 接管的 stdout/stderr，不额外写无限增长的卡内日志。
+服务通过 `--verbose` 将事件同时输出到终端，由 procd 接管 stdout/stderr，
+使用 `logread` 查看，不额外配置无限增长的卡内日志文件。
 这不禁止上游的历史、数据库或诊断文件，仍需监控卡空间并定期备份。
 挂载变化会触发服务重启；无卡时拒绝启动，不自动退回内置闪存。
 拔卡前先 `/etc/init.d/zeroclaw stop`，不要依赖热拔卡保护数据库。
@@ -132,7 +134,7 @@ logread -e zeroclaw
 apk add --allow-untrusted ./zeroclaw-openwrt-*.apk
 ```
 
-不要全局关闭签名检查。随后执行相同的 `zeroclaw onboard` 和 UCI 启用步骤。
+不要全局关闭签名检查。随后执行相同的 `zeroclaw quickstart` 和 UCI 启用步骤。
 卸载集成包不会删除卡上的配置、密钥或数据库；这些数据需要自行安全管理。
 
 本仓库脚本使用 MIT 许可；上游程序的许可文件随归档附带。
