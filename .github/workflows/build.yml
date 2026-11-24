@@ -39,6 +39,18 @@ jobs:
             openwrt/files/zeroclaw.init openwrt/files/zeroclaw-common.sh \
             tests/storage.sh
           sh tests/storage.sh
+      - name: Restore Cargo build cache
+        id: cargo-cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            upstream/target
+          key: ipq4019-${{ runner.os }}-${{ hashFiles('build.env', 'scripts/build.sh') }}-${{ inputs.extra_features }}
+          restore-keys: |
+            ipq4019-${{ runner.os }}-${{ hashFiles('build.env', 'scripts/build.sh') }}-
+            ipq4019-${{ runner.os }}-
       - name: Cross-compile, smoke-test, and package
         run: bash scripts/build.sh
       - name: Upload packages and build evidence
@@ -53,3 +65,12 @@ jobs:
             dist/*-info.txt
           if-no-files-found: warn
           retention-days: 14
+      - name: Save Cargo build cache
+        if: ${{ always() && steps.cargo-cache.outputs.cache-hit != 'true' && steps.cargo-cache.outputs.cache-primary-key != '' }}
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            upstream/target
+          key: ${{ steps.cargo-cache.outputs.cache-primary-key }}

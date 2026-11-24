@@ -27,11 +27,17 @@ fi
 CC_TARGET="${compilers[0]}"
 PREFIX="${CC_TARGET%gcc}"
 export PATH="$(dirname "$CC_TARGET"):$SDK/staging_dir/host/bin:$PATH"
-export CARGO_TARGET_ARMV7_UNKNOWN_LINUX_MUSLEABI_LINKER="$CC_TARGET"
-export CC_armv7_unknown_linux_musleabi="$CC_TARGET"
-export AR_armv7_unknown_linux_musleabi="${PREFIX}ar"
-export CFLAGS_armv7_unknown_linux_musleabi="-Os -mcpu=cortex-a7"
-export CARGO_TARGET_ARMV7_UNKNOWN_LINUX_MUSLEABI_RUSTFLAGS="-C target-cpu=cortex-a7 -C target-feature=+crt-static -C link-arg=-static"
+export CARGO_TARGET_ARMV7_UNKNOWN_LINUX_MUSLEABIHF_LINKER="$CC_TARGET"
+export CC_armv7_unknown_linux_musleabihf="$CC_TARGET"
+export AR_armv7_unknown_linux_musleabihf="${PREFIX}ar"
+export CFLAGS_armv7_unknown_linux_musleabihf="-Os -mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard"
+export CARGO_TARGET_ARMV7_UNKNOWN_LINUX_MUSLEABIHF_RUSTFLAGS="-C target-cpu=cortex-a7 -C target-feature=+crt-static -C link-arg=-static"
+
+"$CC_TARGET" -mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard \
+    -static tests/abi.c -o .sdk/abi-probe
+"${PREFIX}readelf" -h -A .sdk/abi-probe > dist/abi-info.txt
+grep -q 'Tag_ABI_VFP_args: VFP registers' dist/abi-info.txt
+qemu-arm -cpu cortex-a7 .sdk/abi-probe
 
 rustup toolchain install "$RUST_VERSION" --profile minimal --target "$RUST_TARGET"
 git init upstream
@@ -56,6 +62,7 @@ file "$BIN" | tee dist/binary-info.txt
 "${PREFIX}readelf" -h -A -l -d "$BIN" >> dist/binary-info.txt
 grep -Eq 'Class: +ELF32' dist/binary-info.txt
 grep -Eq 'Machine: +ARM' dist/binary-info.txt
+grep -q 'Tag_ABI_VFP_args: VFP registers' dist/binary-info.txt
 if grep -q INTERP dist/binary-info.txt; then
     echo "Unexpected ELF dynamic interpreter; refusing to publish" >&2
     exit 1
@@ -105,7 +112,7 @@ cp "${PACKAGES[0]}" dist/
 )
 {
     echo "### Build artifacts"
-    echo "- ZeroClaw $UPSTREAM_VERSION, static ARMv7 musl EABI, Cortex-A7"
+    echo "- ZeroClaw $UPSTREAM_VERSION, static ARMv7 musl hard-float ABI, Cortex-A7"
     echo "- Features: $FEATURES"
     echo "- MMC deployment archive and small OpenWrt APK integration package"
     echo "- QEMU CLI smoke test passed; real-router operation is NOT yet verified."

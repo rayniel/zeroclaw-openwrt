@@ -17,11 +17,14 @@ CI 的 QEMU 检查只覆盖 CLI 启动，不能证明路由器上的内存占用
 此精简版不包含 Web 前端静态资源，也不保证包含上游完整发行版的所有工具。
 
 `build.env` 固定上游 v0.9.0 的提交、Rust 1.96.0 和官方 OpenWrt SDK 校验值。
-目标是 **`armv7-unknown-linux-musleabi`，不是 glibc，也不是 musleabihf**：
-官方 SDK 使用 musl EABI，以实际工具链 ABI 为准，而非只看 CPU 是否支持浮点。
-使用 SDK 编译 C 依赖及链接，生成静态 ELF，检查动态加载器和共享库依赖，
+目标是 **`armv7-unknown-linux-musleabihf`，不是 glibc**。
+SDK 文件名和 GCC 前缀虽然带 `eabi`，该 Cortex-A7 工具链实际使用硬浮点调用约定；
+OpenWrt 的 Rust 映射也在启用 FPU 时选择 `musleabihf`，不能只按 SDK 名称判断。
+编译前先用 SDK 链接并执行硬浮点小程序；使用同一 SDK 编译 C 依赖及链接，
+生成静态 ELF，检查架构、浮点 ABI、动态加载器和共享库依赖，
 再用 QEMU Cortex-A7 执行版本和帮助命令。
 沿用上游尺寸优化，CI 将 LTO 改为 thin，并限制两个编译任务。
+缓存 Cargo 下载和编译目录，失败后也保留可复用的编译结果。
 
 成功后下载 Actions artifact，其中包含：
 
