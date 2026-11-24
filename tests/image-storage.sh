@@ -74,6 +74,17 @@ EOF
 ZC_MOUNT="$TEST_MOUNT/"
 ZC_STORAGE_MODE=image
 zc_set_paths
+(
+    unset -f stat
+    # shellcheck disable=SC2123
+    PATH="$TEST_DIR/no-tools"
+    awk() { echo 'vfat rw,fmask=0000,dmask=0000'; }
+    if zc_check_parent_storage "$FIXTURE"; then
+        echo "FAIL: image storage must refuse missing stat before preparation" >&2
+        exit 1
+    fi
+    [ ! -d "$ZC_ROOT" ]
+)
 printf '%s\n' "$ZC_IMAGE" > "$SYSFS/loop0/loop/backing_file"
 parent() {
     printf '/dev/card %s vfat %s 0 0\n' "$TEST_MOUNT" "${1:-rw,fmask=0000,dmask=0000}" > "$FIXTURE"

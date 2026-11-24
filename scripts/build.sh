@@ -45,6 +45,7 @@ cp -R openwrt "$SDK/package/zeroclaw-openwrt"
     cd "$SDK"
     ./scripts/feeds update -a
     ./scripts/feeds install ca-bundle
+    ./scripts/feeds install coreutils
     printf '%s\n' \
         'CONFIG_ALL=n' 'CONFIG_ALL_NONSHARED=n' 'CONFIG_ALL_KMODS=n' \
         'CONFIG_PACKAGE_zeroclaw-openwrt=m' > .config

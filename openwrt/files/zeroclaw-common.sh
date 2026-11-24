@@ -66,7 +66,15 @@ zc_check_fat_options() {
     }
 }
 
+zc_require_stat() {
+    if ! command -v stat >/dev/null 2>&1; then
+        echo "zeroclaw: missing stat; install coreutils-stat before preparing or using FAT/image storage" >&2
+        return 1
+    fi
+}
+
 zc_check_fat_access() {
+    zc_require_stat || return 1
     zc_access="$(stat -c '%u:%g:%a' "$1")" || {
         echo "zeroclaw: cannot inspect FAT permissions: $1" >&2
         return 1
@@ -111,6 +119,9 @@ zc_check_parent_storage() {
         zc_check_fat_options "${zc_mount_info#* }" || return 1
         zc_check_fat_access "$ZC_MOUNT" || return 1
         echo "zeroclaw: WARNING: FAT has no per-file Unix permissions/symlinks; keys are readable on a PC and some tools may fail. ext4 is recommended." >&2
+    fi
+    if [ "${ZC_STORAGE_MODE:-direct}" = image ]; then
+        zc_require_stat || return 1
     fi
 }
 

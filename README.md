@@ -90,11 +90,12 @@ OpenWrt 的 `/rom` 通常只读。
 先确认固件提供 vfat/exFAT、loop 和 ext4 支持。APK 固件可安装：
 
 ```sh
-apk add kmod-loop kmod-fs-ext4 e2fsprogs
+apk add kmod-loop kmod-fs-ext4 e2fsprogs coreutils-stat
 ```
 
 opkg 固件使用对应的 `opkg install`，不要混用包管理器。首次创建需要 `mkfs.ext4`，
-运行时需要支持 `-o loop` 的 `mount`、可用 loop 设备和 `/sys/block`；
+运行时需要支持 `-o loop` 的 `mount`、可用 loop 设备、`/sys/block` 和 `stat`
+（部分 OpenWrt BusyBox 不包含它，须安装 `coreutils-stat`）；
 内核模块须与当前固件版本匹配，不能强装不匹配的 kmod。安装依赖仍占内置空间，
 先用 `df -h / /overlay /mnt/mmcblk0p1` 检查余量。
 
@@ -138,6 +139,8 @@ umount /mnt/mmcblk0p1/zeroclaw/state &&
 如果 busy，先停止其他卡访问，不使用强制或 lazy 卸载，不热拔卡。不要把正在使用的
 镜像当作普通文件在线复制备份。失败后安装器可能留下已创建的镜像供重试，不会自动删除数据。
 若锁目录在异常断电后残留，应先确认没有安装或挂载进程，再手动清理明确的锁目录。
+如果旧安装包在创建镜像后报 `stat: not found`，安装 `coreutils-stat` 后重跑
+`install.sh --fat-image` 即可复用镜像，不要删除镜像或重新格式化卡。
 
 ### 裸 vfat/exFAT 的旧式显式兼容模式（有限支持）
 

@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zeroclaw-openwrt
 PKG_VERSION:=0.9.0
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 PKG_LICENSE:=MIT
 PKGARCH:=all
 
@@ -12,7 +12,7 @@ define Package/zeroclaw-openwrt
   SECTION:=utils
   CATEGORY:=Utilities
   TITLE:=ZeroClaw MMC launcher and procd service
-  DEPENDS:=+ca-bundle
+  DEPENDS:=+ca-bundle +coreutils-stat
 endef
 
 define Package/zeroclaw-openwrt/description
