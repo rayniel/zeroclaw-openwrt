@@ -26,7 +26,7 @@ if [[ ${#compilers[@]} -ne 1 || ! -x "${compilers[0]}" ]]; then
 fi
 CC_TARGET="${compilers[0]}"
 PREFIX="${CC_TARGET%gcc}"
-export PATH="$(dirname "$CC_TARGET"):$SDK/staging_dir/host/bin:$PATH"
+export PATH="$(dirname "$CC_TARGET"):$PATH"
 export CARGO_TARGET_ARMV7_UNKNOWN_LINUX_MUSLEABIHF_LINKER="$CC_TARGET"
 export CC_armv7_unknown_linux_musleabihf="$CC_TARGET"
 export AR_armv7_unknown_linux_musleabihf="${PREFIX}ar"
@@ -38,6 +38,24 @@ export CARGO_TARGET_ARMV7_UNKNOWN_LINUX_MUSLEABIHF_RUSTFLAGS="-C target-cpu=cort
 "${PREFIX}readelf" -h -A .sdk/abi-probe > dist/abi-info.txt
 grep -q 'Tag_ABI_VFP_args: VFP registers' dist/abi-info.txt
 qemu-arm -cpu cortex-a7 .sdk/abi-probe
+
+cp -R openwrt "$SDK/package/zeroclaw-openwrt"
+(
+    cd "$SDK"
+    ./scripts/feeds update -a
+    ./scripts/feeds install ca-bundle
+    printf '%s\n' \
+        'CONFIG_ALL=n' 'CONFIG_ALL_NONSHARED=n' 'CONFIG_ALL_KMODS=n' \
+        'CONFIG_PACKAGE_zeroclaw-openwrt=m' > .config
+    make defconfig
+    make package/zeroclaw-openwrt/compile -j2 V=s
+)
+mapfile -t PACKAGES < <(find "$SDK/bin" -type f -name 'zeroclaw-openwrt*.apk')
+if [[ ${#PACKAGES[@]} -ne 1 ]]; then
+    echo "Expected exactly one OpenWrt APK integration package" >&2
+    exit 1
+fi
+cp "${PACKAGES[0]}" dist/
 
 rustup toolchain install "$RUST_VERSION" --profile minimal --target "$RUST_TARGET"
 git init upstream
@@ -89,23 +107,6 @@ cp upstream/LICENSE* "$BUNDLE/licenses/"
 ARCHIVE="zeroclaw-${UPSTREAM_VERSION}-openwrt-ipq4019.tar.gz"
 tar -czf "dist/$ARCHIVE" -C "$BUNDLE" .
 
-cp -R openwrt "$SDK/package/zeroclaw-openwrt"
-(
-    cd "$SDK"
-    ./scripts/feeds update -a
-    ./scripts/feeds install ca-bundle
-    printf '%s\n' \
-        'CONFIG_ALL=n' 'CONFIG_ALL_NONSHARED=n' 'CONFIG_ALL_KMODS=n' \
-        'CONFIG_PACKAGE_zeroclaw-openwrt=m' > .config
-    make defconfig
-    make package/zeroclaw-openwrt/compile -j2 V=s
-)
-mapfile -t PACKAGES < <(find "$SDK/bin" -type f -name 'zeroclaw-openwrt*.apk')
-if [[ ${#PACKAGES[@]} -ne 1 ]]; then
-    echo "Expected exactly one OpenWrt APK integration package" >&2
-    exit 1
-fi
-cp "${PACKAGES[0]}" dist/
 (
     cd dist
     sha256sum "$ARCHIVE" ./*.apk > SHA256SUMS
