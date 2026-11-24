@@ -53,12 +53,14 @@ cargo "+$RUST_VERSION" build --manifest-path upstream/Cargo.toml \
     --no-default-features --features "$FEATURES"
 BIN="$ROOT/upstream/target/$RUST_TARGET/release/zeroclaw"
 file "$BIN" | tee dist/binary-info.txt
-"${PREFIX}readelf" -h -A "$BIN" >> dist/binary-info.txt
-if "${PREFIX}readelf" -l "$BIN" | grep -q INTERP; then
+"${PREFIX}readelf" -h -A -l -d "$BIN" >> dist/binary-info.txt
+grep -Eq 'Class: +ELF32' dist/binary-info.txt
+grep -Eq 'Machine: +ARM' dist/binary-info.txt
+if grep -q INTERP dist/binary-info.txt; then
     echo "Unexpected ELF dynamic interpreter; refusing to publish" >&2
     exit 1
 fi
-if "${PREFIX}readelf" -d "$BIN" | grep -q NEEDED; then
+if grep -q NEEDED dist/binary-info.txt; then
     echo "Unexpected shared-library dependency; refusing to publish" >&2
     exit 1
 fi

@@ -1,5 +1,5 @@
 #!/bin/sh
-set -eu
+set -e
 umask 077
 
 if [ "$(id -u)" -ne 0 ] || [ ! -f /etc/openwrt_release ]; then
