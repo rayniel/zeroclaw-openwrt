@@ -29,22 +29,26 @@ class Provider(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        assert "input" in request, "Expected the official OpenAI Responses API request"
+        response = {
+            "id": "test", "object": "response", "status": "completed", "model": "terminal-test",
+            "output_text": REPLY,
+            "output": [{
+                "id": "message-test", "type": "message", "role": "assistant", "status": "completed",
+                "content": [{"type": "output_text", "text": REPLY, "annotations": []}],
+            }],
+            "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
+        }
         if request.get("stream"):
             chunks = [
-                {"choices": [{"index": 0, "delta": {"role": "assistant", "content": REPLY},
-                              "finish_reason": None}]},
-                {"choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]},
+                {"type": "response.output_text.delta", "delta": REPLY},
+                {"type": "response.completed", "response": response},
             ]
             body = "".join(f"data: {json.dumps(chunk)}\n\n" for chunk in chunks)
             body = (body + "data: [DONE]\n\n").encode()
             content_type = "text/event-stream"
         else:
-            body = json.dumps({
-                "id": "test", "object": "chat.completion", "model": "terminal-test",
-                "choices": [{"index": 0, "message": {"role": "assistant", "content": REPLY},
-                             "finish_reason": "stop"}],
-                "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
-            }).encode()
+            body = json.dumps(response).encode()
             content_type = "application/json"
         self.send_response(200)
         self.send_header("Content-Type", content_type)
@@ -65,7 +69,7 @@ class Rpc:
     def call(self, method, params):
         self.sequence += 1
         request = {"jsonrpc": "2.0", "id": self.sequence, "method": method, "params": params}
-        self.stream.write(json.dumps(request).encode() + b"\n")
+        self.socket.sendall(json.dumps(request).encode() + b"\n")
         while True:
             line = self.stream.readline()
             if not line:
@@ -123,6 +127,10 @@ def drain_terminal(master, stopped, screen):
             raise
 
 
+def claim_terminal():
+    fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+
+
 def main():
     binary, terminal, state = map(Path, sys.argv[1:])
     with tempfile.TemporaryDirectory(prefix="terminal-", dir=state) as directory:
@@ -153,7 +161,7 @@ def main():
             configure("init", "agents.terminal_test")
             settings = {
                 "providers.models.openai.terminal.uri":
-                    f"http://127.0.0.1:{provider.server_port}/v1/chat/completions",
+                    f"http://127.0.0.1:{provider.server_port}/v1/responses",
                 "providers.models.openai.terminal.model": "terminal-test",
                 "providers.models.openai.terminal.api_key": "test-not-a-real-api-key",
                 "agents.terminal_test.model_provider": "openai.terminal",
@@ -190,7 +198,8 @@ def main():
                 fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
                 client = subprocess.Popen(
                     qemu + [str(terminal), "--config-dir", str(config)],
-                    env=env, cwd=root, stdin=slave, stdout=slave, stderr=slave)
+                    env=env, cwd=root, stdin=slave, stdout=slave, stderr=slave,
+                    start_new_session=True, preexec_fn=claim_terminal)
                 draining = threading.Thread(target=drain_terminal, args=(master, stopped, screen),
                                             daemon=True)
                 draining.start()
