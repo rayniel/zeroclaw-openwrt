@@ -12,10 +12,39 @@ CI 的 QEMU 检查只覆盖 CLI 启动，不能证明路由器上的内存占用
 ## 构建
 
 进入本仓库 **Actions → Build ZeroClaw for OpenWrt IPQ4019 → Run workflow**。
-默认启用 `agent-runtime,gateway`，不加入浏览器、WASM 插件或额外渠道。
-需要 Telegram 等渠道时，在 `extra_features` 填写 `channel-telegram`；
+默认启用 `agent-runtime,gateway,channel-feishu,channel-matrix`，包含飞书和 Matrix 渠道，
+不加入浏览器或 WASM 插件。
+需要其他渠道时，在 `extra_features` 填写对应特性，例如 Telegram 的 `channel-telegram`；
 多个 Cargo feature 用英文逗号分隔。额外特性不保证支持 ARMv7。
 此精简版不包含 Web 前端静态资源，也不保证包含上游完整发行版的所有工具。
+
+### 飞书和自建 IM
+
+新版默认编译飞书支持；已有旧产物不会因仓库更新自动获得此特性，须安装新版归档。
+编译支持不等于已配置机器人。通过官方 quickstart 配置 Lark/飞书渠道，
+国内飞书使用 `channels.lark.<渠道名称>` 和 `use_feishu=true`，再绑定已有 agent。
+需要飞书自建应用、机器人能力、App ID / App Secret、消息事件与所需权限；
+密钥只在设备上配置，不填写 Actions 输入或提交到仓库。
+优先使用官方支持的 WebSocket 长连接接收事件，无需开放路由器公网入站端口。
+常驻收发须启用下面的 init daemon，并确认出站 HTTPS/WebSocket、证书及系统时间正常。
+本仓库构建检查不代表已通过真实飞书账户收发验证。
+
+自建 IM 按服务端协议选择，不存在通用的“自建 IM”特性：
+
+| 服务端 | `extra_features` |
+| --- | --- |
+| Matrix，例如 Synapse / Dendrite，搭配 Element 客户端 | `channel-matrix`（新版默认包含） |
+| Mattermost | `channel-mattermost` |
+| IRC 服务端 | `channel-irc` |
+
+本包默认包含 Matrix；Mattermost 和 IRC 仍为可选特性，ARMv7 兼容性需分别构建验证。
+Matrix 需配置实际 homeserver、机器人账户认证和房间访问权限，再绑定已有 agent。
+这只包含 Matrix 客户端渠道，不包含 Synapse / Dendrite 服务端，不默认开启入站端口。
+加密房间等能力以固定上游版本及实际服务端兼容性为准，不能仅凭构建成功保证收发。
+Matrix 适合希望自行托管且使用标准聊天协议的部署，Mattermost 适合团队协作。
+自行开发的私有 IM 若不兼容已支持的协议，则需另写经过认证的桥接/渠道适配；
+不能仅填写任意 WebSocket 地址就接入。自建 IM 服务端宜放在其他服务器，
+不要默认在这台 128 MiB 路由器上部署。
 
 `build.env` 固定上游 v0.9.0 的提交、Rust 1.96.0 和官方 OpenWrt SDK 校验值。
 目标是 **`armv7-unknown-linux-musleabihf`，不是 glibc**。

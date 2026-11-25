@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       extra_features:
-        description: "Optional Cargo features, comma-separated (e.g. channel-telegram)"
+        description: "Additional Cargo features beyond built-in Feishu/Matrix (e.g. channel-telegram)"
         required: false
         default: ""
         type: string

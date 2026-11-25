@@ -61,6 +61,18 @@ if grep -F "$token" "$STATE/config/config.toml"; then
 fi
 qemu-arm -cpu cortex-a7 "$BIN" --config-dir "$STATE/config" \
     config get --json composio.api_key | grep '"populated": true'
+qemu-arm -cpu cortex-a7 "$BIN" --config-dir "$STATE/config" config init channels.lark.feishu_test
+qemu-arm -cpu cortex-a7 "$BIN" --config-dir "$STATE/config" \
+    config set --no-interactive channels.lark.feishu_test.use_feishu true
+qemu-arm -cpu cortex-a7 "$BIN" --config-dir "$STATE/config" \
+    config get channels.lark.feishu_test.use_feishu | grep -Fx true
+echo "Real ARM Feishu configuration checks passed (no live account connection)"
+qemu-arm -cpu cortex-a7 "$BIN" --config-dir "$STATE/config" config init channels.matrix.matrix_test
+qemu-arm -cpu cortex-a7 "$BIN" --config-dir "$STATE/config" \
+    config set --no-interactive channels.matrix.matrix_test.homeserver https://matrix.example.invalid
+qemu-arm -cpu cortex-a7 "$BIN" --config-dir "$STATE/config" \
+    config get channels.matrix.matrix_test.homeserver | grep -Fx https://matrix.example.invalid
+echo "Real ARM Matrix configuration checks passed (no live homeserver connection)"
 
 # Use the real property enumeration/workspace defaults without an interactive TTY.
 qemu-arm -cpu cortex-a7 "$BIN" --config-dir "$STATE/config" config init agents.prompt_test

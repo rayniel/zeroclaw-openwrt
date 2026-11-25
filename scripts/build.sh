@@ -9,7 +9,7 @@ if [[ ! "${EXTRA_FEATURES:-}" =~ ^[a-zA-Z0-9_,-]*$ ]]; then
     echo "EXTRA_FEATURES must be a comma-separated Cargo feature list" >&2
     exit 1
 fi
-FEATURES="agent-runtime,gateway${EXTRA_FEATURES:+,$EXTRA_FEATURES}"
+FEATURES="agent-runtime,gateway,channel-feishu,channel-matrix${EXTRA_FEATURES:+,$EXTRA_FEATURES}"
 mkdir -p .sdk dist
 
 SDK_URL="https://downloads.openwrt.org/releases/$OPENWRT_VERSION/targets/ipq40xx/generic/$SDK_FILE"
